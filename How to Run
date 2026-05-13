@@ -1,0 +1,18 @@
+## ▶️ How to Run
+
+**Mac / Linux:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+**Windows:**
+Double-click `start.bat`
+
+Then open **http://localhost:8000** in your browser.
+
+---
+
+## 👨‍💻 Author
+**Aniket Sharma** — [LinkedIn](https://www.linkedin.com/in/aniket-sharma-736976389/) 
+· [GitHub](https://github.com/sharmaaniket813-star)
