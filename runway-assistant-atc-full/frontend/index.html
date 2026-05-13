@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Runway Assistant ATC - Birmingham Airport</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* reset */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #f0f4f8;
+      color: #1e293b;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* main layout */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* top bar */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 62px;
+      background: white;
+      border-bottom: 2px solid #e2e8f0;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      flex-shrink: 0;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: white;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+    }
+
+    .logo-text { font-size: 16px; font-weight: 700; color: #1e293b; }
+    .logo-sub  { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+
+    .right-side {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* runway badges */
+    .rwy-tag {
+      background: #f0f9ff;
+      border: 1.5px solid #bae6fd;
+      border-radius: 7px;
+      padding: 4px 10px;
+      text-align: center;
+    }
+    .rwy-tag .name { font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #0369a1; }
+    .rwy-tag .open { font-size: 9px; color: #16a34a; font-weight: 500; }
+
+    /* live indicator */
+    .live-tag {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+    }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #16a34a;
+      animation: blink 2s infinite;
+    }
+    .live-dot.red { background: #dc2626; animation: none; }
+    .live-txt { font-size: 10px; font-weight: 600; color: #16a34a; }
+
+    /* clock */
+    .clock { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 600; color: #1e40af; }
+    .clock-label { font-size: 9px; color: #94a3b8; }
+
+    /* weather in header */
+    .wx-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: #fafafa;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 5px 12px;
+    }
+    .wx-bar img { width: 32px; height: 32px; }
+    .wx-temp { font-size: 15px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .wx-small { font-size: 10px; color: #64748b; line-height: 1.4; }
+    .wx-badge {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .wx-ok  { background: #f0fdf4; color: #16a34a; }
+    .wx-warn { background: #fffbeb; color: #d97706; }
+    .wx-bad  { background: #fff5f5; color: #dc2626; }
+
+    /* divider line */
+    .vline { width: 1px; height: 32px; background: #e2e8f0; }
+
+    /* flight ticker */
+    #ticker-wrap {
+      overflow: hidden;
+      background: #1e40af;
+      height: 28px;
+      flex-shrink: 0;
+    }
+    #ticker-inner {
+      display: flex;
+      white-space: nowrap;
+      will-change: transform;
+      padding: 5px 0;
+      font-size: 11px;
+      color: white;
+    }
+
+    /* error message */
+    #err-box {
+      display: none;
+      background: #fff5f5;
+      border: 1.5px solid #fca5a5;
+      margin: 10px;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    /* main content area */
+    #content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* left sidebar */
+    #sidebar {
+      width: 242px;
+      border-right: 1px solid #e2e8f0;
+      background: white;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    /* center panel */
+    #center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    /* right panel */
+    #right-panel {
+      width: 282px;
+      border-left: 1px solid #e2e8f0;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    /* section title style */
+    .sec-hdr {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    /* stats cards in sidebar */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 11px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .stat-lbl { font-size: 11px; color: #64748b; }
+    .stat-num { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+    /* weather card */
+    .wx-card {
+      display: none;
+      background: linear-gradient(135deg, #eff6ff, #f0f9ff);
+      border: 1.5px solid #bae6fd;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .wx-big { font-size: 26px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .wx-row { display: flex; justify-content: space-between; font-size: 10px; color: #475569; margin-top: 4px; }
+    .wx-key { color: #94a3b8; }
+
+    /* delay list in sidebar */
+    .delay-box {
+      display: none;
+      background: #fff5f5;
+      border: 1.5px solid #fecaca;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .delay-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #fef2f2;
+      cursor: pointer;
+    }
+
+    /* airport info table */
+    .info-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .info-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 11px;
+    }
+    .info-line:last-child { border: none; }
+    .info-k { color: #94a3b8; }
+    .info-v { color: #475569; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+
+    /* metrics bar */
+    #metrics-bar {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .metric {
+      flex: 1;
+      padding: 10px 12px;
+      text-align: center;
+      border-right: 1px solid #f1f5f9;
+    }
+    .metric:last-child { border: none; }
+    .m-lbl { font-size: 9px; font-weight: 600; color: #94a3b8; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 3px; }
+    .m-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+    /* toolbar */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 16px;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+
+    /* filter button groups */
+    .btn-group {
+      display: flex;
+      gap: 3px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .flt-btn {
+      background: none;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+    .flt-btn.active {
+      background: white;
+      color: #1e40af;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    /* action buttons */
+    .act-btn {
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      border: none;
+    }
+    .btn-red   { background: #fff5f5; border: 1.5px solid #fca5a5; color: #dc2626; }
+    .btn-blue  { background: #eff6ff; border: 1.5px solid #93c5fd; color: #1e40af; }
+    .btn-green { background: #f0fdf4; border: 1.5px solid #86efac; color: #16a34a; }
+    .btn-red:hover   { background: #fee2e2; }
+    .btn-blue:hover  { background: #dbeafe; }
+    .btn-green:hover { background: #dcfce7; }
+
+    /* tabs */
+    #tab-bar {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 9px 14px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .tab-btn.active { color: #1e40af; border-bottom-color: #1e40af; }
+
+    /* flight table */
+    #table-area { flex: 1; overflow-y: auto; }
+
+    .tbl-head {
+      display: grid;
+      grid-template-columns: 90px 85px 52px 52px 68px 68px 68px 100px 80px;
+      padding: 8px 16px;
+      background: #f8fafc;
+      border-bottom: 1.5px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .th { font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; }
+
+    .flight-row {
+      display: grid;
+      grid-template-columns: 90px 85px 52px 52px 68px 68px 68px 100px 80px;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+    }
+    .flight-row:hover { background: #f8fafc; }
+    .flight-row.selected { background: #eff6ff; border-left-color: #3b82f6; }
+    .flight-row.mild-delay { border-left-color: #f59e0b; background: #fffbeb; }
+    .flight-row.big-delay  { border-left-color: #ef4444; background: #fff5f5; }
+
+    .cs { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: #1e293b; }
+    .al { font-size: 10px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ty { font-size: 10px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; }
+    .t-s { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #94a3b8; }
+    .t-o { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #1e40af; font-weight: 600; }
+
+    /* badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .b-arr   { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .b-dep   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .b-ok    { background: #f0fdf4; color: #16a34a; }
+    .b-mild  { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .b-hold  { background: #fff5f5; color: #dc2626; border: 1px solid #fecaca; }
+    .b-land  { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .b-dep2  { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .b-hld   { background: #faf5ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+    .b-live  { background: #ecfdf5; color: #059669; border: 1px solid #6ee7b7; font-size: 8px; }
+    .b-sim   { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; font-size: 8px; }
+
+    /* status dot */
+    .s-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+    /* timeline */
+    #timeline-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: none;
+    }
+    .tl-row { display: flex; align-items: center; margin-bottom: 14px; }
+    .tl-lbl { width: 78px; font-size: 10px; font-weight: 600; color: #64748b; }
+    .tl-track {
+      flex: 1;
+      position: relative;
+      height: 40px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    .tl-now {
+      position: absolute;
+      top: -4px; bottom: -4px;
+      width: 2px;
+      background: #ef4444;
+      z-index: 3;
+      border-radius: 1px;
+    }
+    .tl-blip {
+      position: absolute;
+      top: 5px; bottom: 5px;
+      width: 32px;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7px;
+      font-weight: 600;
+    }
+
+    /* right panel sections */
+    .rp-block { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+
+    .d-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #f8fafc;
+      font-size: 11px;
+    }
+    .dk { color: #94a3b8; }
+    .dv { color: #334155; font-family: 'JetBrains Mono', monospace; }
+
+    .delay-warn {
+      background: #fff5f5;
+      border: 1.5px solid #fecaca;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+
+    .note-txt { font-size: 11px; color: #64748b; line-height: 1.7; padding: 2px 0; }
+
+    /* ATC decision box */
+    .atc-box {
+      background: #f0f9ff;
+      border: 1.5px solid #bae6fd;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .atc-hdr { font-size: 9px; font-weight: 700; color: #0369a1; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .atc-line {
+      background: white;
+      border-left: 3px solid #3b82f6;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+      border-radius: 0 5px 5px 0;
+      font-size: 11px;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    .legend-item { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+    .legend-txt  { font-size: 11px; color: #64748b; line-height: 1.4; }
+
+    /* radar */
+    #radar { border-radius: 50%; border: 2px solid #bfdbfe; box-shadow: 0 0 0 4px #eff6ff; }
+
+    /* modal */
+    #modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      z-index: 600;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #modal-bg.open { display: flex; }
+
+    #modal {
+      background: white;
+      border-radius: 14px;
+      width: 600px;
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      border: 1px solid #e2e8f0;
+    }
+
+    .modal-top {
+      padding: 18px 22px;
+      border-bottom: 1px solid #f1f5f9;
+      background: linear-gradient(135deg, #fff5f5, white);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 14px 14px 0 0;
+    }
+    .modal-tag { font-size: 9px; font-weight: 700; color: #dc2626; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+    .modal-cs  { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 22px; color: #1e293b; }
+    .modal-al  { font-size: 12px; color: #64748b; margin-left: 10px; }
+
+    .close-btn {
+      background: #f1f5f9;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #64748b;
+      font-family: 'Inter', sans-serif;
+    }
+    .close-btn:hover { background: #e2e8f0; }
+
+    .modal-body { padding: 22px; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .kpi {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .kpi-lbl { font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 4px; }
+    .kpi-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
+
+    .route-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .route-k { font-size: 9px; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; }
+    .route-v { font-size: 12px; font-weight: 600; color: #1e293b; }
+
+    .freed-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+    }
+
+    .modal-sec { font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 10px; }
+  </style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- top navigation bar -->
+  <div id="topbar">
+    <div class="logo-area">
+      <div class="logo-box">✈</div>
+      <div>
+        <div class="logo-text">Runway Assistant ATC</div>
+        <div class="logo-sub">Birmingham Airport · EGBB/BHX · Birmingham, United Kingdom</div>
+      </div>
+    </div>
+
+    <div class="right-side">
+      <!-- weather shows here once loaded -->
+      <div class="wx-bar" id="hdr-wx">
+        <img id="hdr-wx-img" src="" alt="wx" />
+        <div>
+          <div class="wx-temp" id="hdr-temp">--°C</div>
+          <div class="wx-small" id="hdr-desc">Loading weather...</div>
+        </div>
+        <span class="wx-badge wx-ok" id="hdr-badge">VMC</span>
+      </div>
+
+      <div class="vline"></div>
+
+      <div class="rwy-tag"><div class="name">RWY 15</div><div class="open">● OPEN</div></div>
+      <div class="rwy-tag"><div class="name">RWY 33</div><div class="open">● OPEN</div></div>
+
+      <div class="vline"></div>
+
+      <div class="live-tag">
+        <div class="live-dot" id="conn-dot"></div>
+        <span class="live-txt" id="conn-txt">CONNECTING</span>
+      </div>
+
+      <div class="vline"></div>
+
+      <div style="text-align: right;">
+        <div class="clock" id="clock">08:00</div>
+        <div class="clock-label">BST · EGBB</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- scrolling ticker -->
+  <div id="ticker-wrap">
+    <div id="ticker-inner"></div>
+  </div>
+
+  <!-- error message if backend not running -->
+  <div id="err-box">
+    <div style="color: #dc2626; font-size: 12px;" id="err-msg"></div>
+  </div>
+
+  <!-- main content -->
+  <div id="content">
+
+    <!-- left sidebar -->
+    <div id="sidebar">
+
+      <!-- radar -->
+      <div style="text-align: center;">
+        <div class="sec-hdr">Approach Radar · BHX</div>
+        <canvas id="radar" width="196" height="196"></canvas>
+        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 8px; font-size: 10px; font-weight: 500;">
+          <span style="color: #1e40af;">● ARR</span>
+          <span style="color: #16a34a;">● DEP</span>
+          <span style="color: #dc2626;">● DLY</span>
+        </div>
+      </div>
+
+      <!-- live weather card -->
+      <div class="wx-card" id="wx-card">
+        <div class="sec-hdr">Live Weather · Birmingham</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div>
+            <div class="wx-big" id="wx-temp">--°C</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;" id="wx-desc">Loading...</div>
+          </div>
+          <img id="wx-icon" src="" alt="weather" style="width: 48px; height: 48px;" />
+        </div>
+        <div class="wx-row"><span class="wx-key">Wind</span><span id="wx-wind">--</span></div>
+        <div class="wx-row"><span class="wx-key">Visibility</span><span id="wx-vis">--</span></div>
+        <div class="wx-row"><span class="wx-key">Condition</span><span id="wx-cond" style="font-weight: 600;">--</span></div>
+      </div>
+
+      <!-- flight stats -->
+      <div id="stats-list" style="display: flex; flex-direction: column; gap: 5px;"></div>
+
+      <!-- delayed flights list -->
+      <div class="delay-box" id="delay-box">
+        <div class="sec-hdr" style="color: #dc2626;">⚠ Delayed Flights</div>
+        <div id="delay-list"></div>
+      </div>
+
+      <!-- airport info -->
+      <div class="info-box">
+        <div class="sec-hdr">Aerodrome Info</div>
+        <div class="info-line"><span class="info-k">ICAO</span><span class="info-v">EGBB</span></div>
+        <div class="info-line"><span class="info-k">IATA</span><span class="info-v">BHX</span></div>
+        <div class="info-line"><span class="info-k">Elevation</span><span class="info-v">325 ft</span></div>
+        <div class="info-line"><span class="info-k">Timezone</span><span class="info-v">BST UTC+1</span></div>
+        <div class="info-line"><span class="info-k">Runway</span><span class="info-v">15/33 · 3052m</span></div>
+        <div class="info-line"><span class="info-k">Capacity</span><span class="info-v">~45 mov/hr</span></div>
+      </div>
+    </div>
+
+    <!-- center panel -->
+    <div id="center">
+
+      <!-- top metrics -->
+      <div id="metrics-bar">
+        <div class="metric"><div class="m-lbl">Arrivals</div><div class="m-val" id="m-arr" style="color:#1e40af">0</div></div>
+        <div class="metric"><div class="m-lbl">Departures</div><div class="m-val" id="m-dep" style="color:#16a34a">0</div></div>
+        <div class="metric"><div class="m-lbl">Delays</div><div class="m-val" id="m-dly" style="color:#94a3b8">0</div></div>
+        <div class="metric"><div class="m-lbl">Holding</div><div class="m-val" id="m-hld" style="color:#94a3b8">0</div></div>
+        <div class="metric"><div class="m-lbl">Live Flights</div><div class="m-val" id="m-live" style="color:#059669">0</div></div>
+        <div class="metric"><div class="m-lbl">Avg Delay</div><div class="m-val" id="m-avg" style="color:#1e40af">0m</div></div>
+      </div>
+
+      <!-- toolbar with filters and buttons -->
+      <div id="toolbar">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="btn-group">
+            <button class="flt-btn active" data-f="ALL"  onclick="setFilter('ALL')">All</button>
+            <button class="flt-btn"        data-f="ARR"  onclick="setFilter('ARR')">Arrivals</button>
+            <button class="flt-btn"        data-f="DEP"  onclick="setFilter('DEP')">Departures</button>
+          </div>
+          <div class="btn-group">
+            <button class="flt-btn active" data-s="ALL"  onclick="setSrc('ALL')">All Sources</button>
+            <button class="flt-btn"        data-s="LIVE" onclick="setSrc('LIVE')">Live Only</button>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="font-size: 10px; color: #94a3b8;">Click a delayed row to see ATC decision</span>
+          <button class="act-btn btn-green" onclick="refreshWeather()">⟳ Weather</button>
+          <button class="act-btn btn-red"   onclick="simDelay()">⚠ Simulate Delay</button>
+          <button class="act-btn btn-blue"  onclick="addFlight()">+ Add Flight</button>
+        </div>
+      </div>
+
+      <!-- tab buttons -->
+      <div id="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('schedule')">Schedule</button>
+        <button class="tab-btn"        onclick="switchTab('timeline')">Timeline</button>
+      </div>
+
+      <!-- schedule view -->
+      <div id="table-area">
+        <div class="tbl-head">
+          <div class="th">Callsign</div>
+          <div class="th">Airline</div>
+          <div class="th">Type</div>
+          <div class="th">Op</div>
+          <div class="th">Scheduled</div>
+          <div class="th">Opt Slot</div>
+          <div class="th">Delay</div>
+          <div class="th">Clearance</div>
+          <div class="th">Status</div>
+        </div>
+        <div id="flight-list"></div>
+        <div id="no-flights" style="padding: 40px; text-align: center; color: #94a3b8; font-size: 13px; display: none;">
+          No flights yet — click <strong>+ Add Flight</strong> to get started
+        </div>
+      </div>
+
+      <!-- timeline view (hidden by default) -->
+      <div id="timeline-area">
+        <div style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 14px;">
+          RUNWAY 15/33 · BHX · 08:00 — 10:00
+        </div>
+        <div id="tl-ruler" style="display: flex; padding-left: 78px; margin-bottom: 6px;"></div>
+
+        <div class="tl-row">
+          <div class="tl-lbl" style="color: #1e40af;">Arrivals</div>
+          <div class="tl-track" id="track-arr">
+            <div class="tl-now" id="now-arr"></div>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="tl-lbl" style="color: #16a34a;">Departures</div>
+          <div class="tl-track" id="track-dep">
+            <div class="tl-now" id="now-dep"></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; display: flex; gap: 16px; font-size: 10px; color: #94a3b8; font-weight: 500;">
+          <span><span style="color:#f59e0b">■</span> Delayed (&lt;30m)</span>
+          <span><span style="color:#ef4444">■</span> Hold (&gt;30m)</span>
+          <span><span style="color:#059669">■</span> Live data</span>
+          <span><span style="color:#ef4444">│</span> Now</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- right detail panel -->
+    <div id="right-panel">
+      <div class="rp-block">
+        <div class="sec-hdr">Flight Detail</div>
+        <div id="detail-area">
+          <div style="padding: 30px 0; text-align: center;">
+            <div style="font-size: 36px; margin-bottom: 12px;">✈</div>
+            <div style="font-size: 12px; color: #94a3b8; line-height: 1.8;">
+              Select any flight to view details.<br>
+              Click a delayed flight for the ATC decision.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rp-block">
+        <div class="sec-hdr">Clearance Types</div>
+        <div class="legend-item"><span class="badge b-land">✓ LAND</span><span class="legend-txt">Cleared to land at Birmingham</span></div>
+        <div class="legend-item"><span class="badge b-dep2">✓ TAKE-OFF</span><span class="legend-txt">Cleared for departure from BHX</span></div>
+        <div class="legend-item"><span class="badge b-hld">⏸ HOLD</span><span class="legend-txt">Hold — slot given to on-time traffic</span></div>
+        <div style="margin-top: 10px; font-size: 11px; color: #94a3b8; line-height: 1.7; background: #f8fafc; border-radius: 8px; padding: 10px;">
+          Delays over 30 min trigger a HOLD and the slot is reassigned. Fuel, cost and CO₂ are calculated for every delay. Weather conditions affect separation times.
+        </div>
+      </div>
+
+      <div class="rp-block">
+        <div class="sec-hdr">Data Sources</div>
+        <div class="info-line"><span class="info-k">Arrivals</span><span class="info-v">AviationStack API</span></div>
+        <div class="info-line"><span class="info-k">Weather</span><span class="info-v">OpenWeatherMap API</span></div>
+        <div class="info-line"><span class="info-k">Departures</span><span class="info-v">Simulated</span></div>
+        <div class="info-line"><span class="info-k">Scheduling</span><span class="info-v">Rule-based engine</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- modal for delay decisions -->
+<div id="modal-bg" onclick="closeModal()">
+  <div id="modal" onclick="event.stopPropagation()">
+    <div class="modal-top">
+      <div>
+        <div class="modal-tag">⚠ Delay Alert · Birmingham ATC · EGBB</div>
+        <div>
+          <span class="modal-cs" id="m-callsign">--</span>
+          <span class="modal-al" id="m-airline"></span>
+        </div>
+      </div>
+      <button class="close-btn" onclick="closeModal()">✕ Close</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="kpi-grid" id="m-kpis"></div>
+      <div class="kpi-grid" id="m-costs"></div>
+
+      <div class="route-box">
+        <div>
+          <div class="route-k">From</div>
+          <div class="route-v" id="m-from">--</div>
+        </div>
+        <div style="color: #cbd5e1; font-size: 20px;">→</div>
+        <div style="text-align: right;">
+          <div class="route-k">To</div>
+          <div class="route-v" id="m-to">--</div>
+        </div>
+      </div>
+
+      <!-- weather note if conditions are bad -->
+      <div id="m-wx" style="display: none; margin-bottom: 14px;"></div>
+
+      <div style="margin-bottom: 16px;">
+        <div class="modal-sec">Flights Cleared to Use Freed Runway Slot</div>
+        <div id="m-freed"></div>
+      </div>
+
+      <div>
+        <div class="modal-sec">ATC Clearance Decision · Birmingham Approach</div>
+        <div id="m-decision"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  // api base url
+  const BASE = 'http://localhost:8000/api';
+
+  // app state
+  let flights     = [];
+  let wxData      = {};
+  let selected    = null;
+  let simTime     = 480;  // starts at 08:00
+  let opFilter    = 'ALL';
+  let srcFilter   = 'ALL';
+  let currentTab  = 'schedule';
+  let tickerPos   = 0;
+  let radarAngle  = 0;
+  let connected   = false;
+
+  // helper functions
+  const toTime = mins => {
+    if (mins == null) return '—';
+    const h  = Math.floor((mins % 1440) / 60);
+    const m  = mins % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  };
+  const toGbp = n => n != null ? `£${Number(n).toFixed(0)}` : '—';
+  const toKg  = n => n != null ? `${Number(n).toFixed(0)} kg` : '—';
+  const g     = id => document.getElementById(id);
+
+  async function callApi(path, options = {}) {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+    if (!res.ok) throw new Error(`${path} failed with ${res.status}`);
+    return res.json();
+  }
+
+  // ---- ATC decision logic (rule based, no AI) ----
+
+  function makeAtcDecision(flight, allFlights, wx) {
+    const delay  = flight.delay_mins || 0;
+    const isArr  = flight.operation === 'ARRIVAL';
+    const cat    = flight.category || 'Medium';
+    const cs     = flight.callsign;
+
+    // find flights that can use the slot this flight freed up
+    const canGoInstead = allFlights.filter(x =>
+      x.id !== flight.id
+      && x.delay_mins === 0
+      && x.optimized_slot >= (flight.scheduled_time - 2)
+      && x.optimized_slot <= (flight.eta + 3)
+    );
+
+    const lines = [];
+
+    // main instruction to the delayed flight
+    if (delay > 30) {
+      lines.push(`${cs}, Birmingham Approach: hold at present position, expect further clearance at ${toTime(flight.eta + 5)}. Your slot at ${toTime(flight.scheduled_time)} has been released due to +${delay} minute delay.`);
+    } else {
+      lines.push(`${cs}, Birmingham Approach: expect revised ${isArr ? 'landing' : 'departure'} slot ${toTime(flight.optimized_slot)}, delayed +${delay} minutes from scheduled time ${toTime(flight.scheduled_time)}.`);
+    }
+
+    // who gets the freed slot
+    if (canGoInstead.length > 0) {
+      const names = canGoInstead.map(x => x.callsign).join(', ');
+      const op    = canGoInstead[0].operation === 'ARRIVAL' ? 'land' : 'depart';
+      lines.push(`Freed slot at ${toTime(flight.scheduled_time)} allocated to ${names} — cleared to ${op} in sequence. Wake vortex separation maintained per ICAO standards.`);
+    } else {
+      lines.push(`No on-time replacement found for slot ${toTime(flight.scheduled_time)}. Runway held — next available window at ${toTime(flight.eta)}.`);
+    }
+
+    // wake vortex separation requirements
+    const sepTable = {
+      Heavy:  { Heavy: '3 nm', Medium: '4 nm', Light: '5 nm' },
+      Medium: { Heavy: '2 nm', Medium: '3 nm', Light: '3 nm' },
+      Light:  { Heavy: '2 nm', Medium: '2 nm', Light: '2 nm' }
+    };
+    const sepVals = Object.entries(sepTable[cat] || {}).map(([k,v]) => `${v} behind ${k}`).join(', ');
+    lines.push(`Wake vortex category: ${cat}. Required separation — ${sepVals}.`);
+
+    // add weather warning if needed
+    if (wx && wx.severity === 'critical') {
+      lines.push(`⚠ LVP active at EGBB — visibility ${wx.visibility_km} km, all separation buffers doubled. Further delays expected.`);
+    } else if (wx && wx.severity === 'warning') {
+      lines.push(`Wind advisory: ${wx.wind_kt} kt at EGBB — separation buffers increased ×1.3. Caution on approach.`);
+    }
+
+    // cost and fuel impact
+    if (delay > 0) {
+      const burnRates = { Heavy: 19, Medium: 11.5, Light: 3 };
+      const burn = burnRates[cat] || 11.5;
+      const fuel = Math.round(delay * burn);
+      const cost = Math.round(fuel * 1.4);
+      const co2  = Math.round(fuel * 3.16);
+      lines.push(`Delay impact estimate: ${fuel} kg fuel lost, £${cost} additional operating cost, ${co2} kg CO₂ emitted.`);
+    }
+
+    return lines;
+  }
+
+  // ---- weather display ----
+
+  function showWeather(wx) {
+    wxData = wx || {};
+    if (!wx || !wx.live) return;
+
+    // header bar
+    g('hdr-wx').style.display  = 'flex';
+    g('hdr-wx-img').src        = wx.icon_url || '';
+    g('hdr-temp').textContent  = `${wx.temp}°C`;
+    g('hdr-desc').textContent  = wx.description || '';
+
+    const badge = g('hdr-badge');
+    if (wx.severity === 'critical') { badge.textContent = 'LVP'; badge.className = 'wx-badge wx-bad'; }
+    else if (wx.severity === 'warning') { badge.textContent = 'Advisory'; badge.className = 'wx-badge wx-warn'; }
+    else { badge.textContent = 'VMC'; badge.className = 'wx-badge wx-ok'; }
+
+    // sidebar card
+    g('wx-card').style.display = 'block';
+    g('wx-icon').src           = wx.icon_url || '';
+    g('wx-temp').textContent   = `${wx.temp}°C`;
+    g('wx-desc').textContent   = wx.description || '';
+    g('wx-wind').textContent   = `${wx.wind_ms} m/s (${wx.wind_kt} kt)`;
+    g('wx-vis').textContent    = `${wx.visibility_km} km`;
+
+    const condEl = g('wx-cond');
+    condEl.textContent  = wx.condition || '—';
+    condEl.style.color  = wx.severity === 'critical' ? '#dc2626' : wx.severity === 'warning' ? '#d97706' : '#16a34a';
+  }
+
+  async function refreshWeather() {
+    if (!connected) return;
+    try {
+      const wx = await callApi('/weather/refresh', { method: 'POST' });
+      showWeather(wx);
+    } catch(e) {
+      console.log('Weather refresh failed:', e);
+    }
+  }
+
+  // ---- startup ----
+
+  async function startApp() {
+    try {
+      await callApi('/health');
+      connected = true;
+      g('conn-dot').className  = 'live-dot';
+      g('conn-txt').textContent = 'LIVE';
+      g('conn-txt').style.color = '#16a34a';
+
+      const data = await callApi('/flights/init', { method: 'POST' });
+      if (data.metrics && data.metrics.weather) showWeather(data.metrics.weather);
+      updateFlights(data.flights, data.metrics);
+
+    } catch(e) {
+      connected = false;
+      g('conn-dot').classList.add('red');
+      g('conn-txt').textContent = 'OFFLINE';
+      g('conn-txt').style.color = '#dc2626';
+
+      g('err-box').style.display = 'block';
+      g('err-msg').innerHTML = '⚠ Backend not running — open a terminal and run: cd backend && python3 server.py';
+
+      // load fake data so the ui isn't empty
+      loadFakeData();
+    }
+  }
+
+  function loadFakeData() {
+    // basic mock data when backend is down
+    const alList  = [['TOM','TUI'],['FR','Ryanair'],['U2','easyJet'],['BA','British Airways'],['LS','Jet2']];
+    const tyList  = ['B737','A320','A321','A319','B757'];
+    const wk      = { B737:'Medium', A320:'Medium', A321:'Medium', A319:'Light', B757:'Medium' };
+    const sepM    = { Heavy:{Heavy:3,Medium:4,Light:5}, Medium:{Heavy:2,Medium:3,Light:3}, Light:{Heavy:2,Medium:2,Light:2} };
+    const destList = ['Amsterdam (AMS)','Dublin (DUB)','Malaga (AGP)','Tenerife (TFS)','Palma (PMI)'];
+    let idNum = 1;
+
+    const raw = Array.from({ length: 14 }, (_, i) => {
+      const [code, name] = alList[Math.floor(Math.random() * alList.length)];
+      const type   = tyList[Math.floor(Math.random() * tyList.length)];
+      const isArr  = Math.random() > 0.45;
+      const sched  = 480 + i * 7 + Math.floor(Math.random() * 5);
+      const delay  = Math.random() > 0.7 ? Math.floor(10 + Math.random() * 50) : 0;
+      const dest   = destList[Math.floor(Math.random() * destList.length)];
+      return {
+        id: `BHX${String(idNum++).padStart(3,'0')}`,
+        callsign: `${code}${Math.floor(100 + Math.random() * 899)}`,
+        airline: name, type, category: wk[type] || 'Medium',
+        operation: isArr ? 'ARRIVAL' : 'DEPARTURE',
+        scheduled_time: sched, eta: sched + delay, delay_mins: delay,
+        origin: isArr ? dest : 'Birmingham (BHX)',
+        destination: isArr ? 'Birmingham (BHX)' : dest,
+        passengers: Math.floor(80 + Math.random() * 130),
+        gate: `G${Math.floor(1 + Math.random() * 20)}`,
+        runway: '15', optimized_slot: null,
+        permission_type: null, permission_granted: false,
+        swapped_with: null, notes: [],
+        fuel_lost_kg: 0, cost_gbp: 0, co2_kg: 0,
+        status: delay > 0 ? 'delayed' : (isArr ? 'scheduled' : (Math.random() > 0.5 ? 'boarding' : 'scheduled')),
+        live: false,
+      };
+    });
+
+    // apply basic scheduling
+    const sorted = [...raw].sort((a, b) => a.eta - b.eta);
+    const built  = [];
+    sorted.forEach((f, i) => {
+      const prev = built[i - 1];
+      const sep  = prev ? (sepM[prev.category] || {})[f.category] || 2 : 0;
+      const slot = Math.max(prev ? prev.optimized_slot + sep : f.eta, f.eta);
+      const pt   = f.delay_mins > 30 ? 'HOLD' : (f.operation === 'ARRIVAL' ? 'LAND' : 'TAKE-OFF');
+      const pg   = f.delay_mins <= 30;
+      const sd   = Math.max(0, slot - f.scheduled_time);
+      const burn = f.category === 'Heavy' ? 19 : f.category === 'Medium' ? 11.5 : 3;
+      const fuel = Math.round(sd * burn * 10) / 10;
+      built.push({ ...f, optimized_slot: slot, permission_type: pt, permission_granted: pg,
+        fuel_lost_kg: fuel, cost_gbp: Math.round(fuel * 1.4 * 100) / 100, co2_kg: Math.round(fuel * 3.16 * 10) / 10 });
+    });
+
+    flights = built.sort((a, b) => a.optimized_slot - b.optimized_slot);
+    renderAll();
+  }
+
+  // ---- data helpers ----
+
+  function updateFlights(f, metrics) {
+    flights = f || [];
+    if (metrics && metrics.weather) showWeather(metrics.weather);
+    renderAll(metrics);
+  }
+
+  async function addFlight() {
+    if (!connected) { alert('Backend is offline'); return; }
+    try {
+      const d = await callApi('/flights/add', { method: 'POST', body: JSON.stringify({ base_time: simTime + Math.floor(Math.random() * 45) }) });
+      updateFlights(d.flights, d.metrics);
+    } catch(e) { console.log('add failed:', e); }
+  }
+
+  async function simDelay() {
+    if (!connected) { alert('Backend is offline'); return; }
+    try {
+      const d = await callApi('/flights/delay', { method: 'POST' });
+      updateFlights(d.flights, d.metrics);
+      if (d.flight) { selected = d.flight; renderDetail(); openModal(d.flight); }
+    } catch(e) { console.log('sim delay failed:', e); }
+  }
+
+  // ---- rendering ----
+
+  function localStats() {
+    const total  = flights.length;
+    const delays = flights.map(f => Math.max(0, (f.optimized_slot || 0) - (f.scheduled_time || 0)));
+    return {
+      total,
+      arrivals:    flights.filter(f => f.operation === 'ARRIVAL').length,
+      departures:  flights.filter(f => f.operation === 'DEPARTURE').length,
+      delayed:     flights.filter(f => f.delay_mins > 0).length,
+      holding:     flights.filter(f => f.permission_type === 'HOLD').length,
+      cleared:     flights.filter(f => f.permission_granted && f.permission_type !== 'HOLD').length,
+      live_flights:flights.filter(f => f.live).length,
+      avg_delay:   total ? Math.round(delays.reduce((a,b) => a+b, 0) / total * 10) / 10 : 0,
+    };
+  }
+
+  function renderAll(serverStats) {
+    const stats = serverStats || localStats();
+    updateMetricsBar(stats);
+    updateSidebarStats(stats);
+    renderDelayList();
+    renderTable();
+    renderTimeline();
+    renderTicker();
+    if (selected) renderDetail();
+  }
+
+  function updateMetricsBar(s) {
+    g('m-arr').textContent  = s.arrivals || 0;
+    g('m-dep').textContent  = s.departures || 0;
+    g('m-dly').textContent  = s.delayed || 0;
+    g('m-dly').style.color  = (s.delayed || 0) > 0 ? '#dc2626' : '#94a3b8';
+    g('m-hld').textContent  = s.holding || 0;
+    g('m-hld').style.color  = (s.holding || 0) > 0 ? '#7c3aed' : '#94a3b8';
+    g('m-live').textContent = s.live_flights || 0;
+    g('m-avg').textContent  = `${s.avg_delay || 0}m`;
+    g('m-avg').style.color  = (s.avg_delay || 0) > 10 ? '#d97706' : '#1e40af';
+  }
+
+  function updateSidebarStats(s) {
+    const items = [
+      ['Total Flights',      s.total || 0,        '#1e40af'],
+      ['Live (AviationStack)', s.live_flights || 0, '#059669'],
+      ['Arrivals',           s.arrivals || 0,     '#1e40af'],
+      ['Departures',         s.departures || 0,   '#16a34a'],
+      ['Delayed',            s.delayed || 0,      (s.delayed||0) > 0 ? '#dc2626' : '#94a3b8'],
+      ['Holding',            s.holding || 0,      (s.holding||0) > 0 ? '#7c3aed' : '#94a3b8'],
+      ['Cleared',            s.cleared || 0,      '#16a34a'],
+    ];
+    g('stats-list').innerHTML = items.map(([label, val, color]) => `
+      <div class="stat-row">
+        <span class="stat-lbl">${label}</span>
+        <span class="stat-num" style="color:${color}">${val}</span>
+      </div>`).join('');
+  }
+
+  function renderDelayList() {
+    const delayed = flights.filter(f => f.delay_mins > 0);
+    const box     = g('delay-box');
+    if (!delayed.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    g('delay-list').innerHTML = delayed.map(f => `
+      <div class="delay-entry" onclick="pickFlight('${f.id}', true)">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#1e293b;">${f.callsign}</span>
+        <span class="badge ${f.delay_mins > 30 ? 'b-hold' : 'b-mild'}">${f.delay_mins > 30 ? '⏸ HOLD' : '+' + f.delay_mins + 'm'}</span>
+      </div>`).join('');
+  }
+
+  // status label/colour lookup
+  const statusInfo = {
+    scheduled: { label: 'Scheduled', color: '#1e40af' },
+    boarding:  { label: 'Boarding',  color: '#d97706' },
+    taxiing:   { label: 'Taxiing',   color: '#0891b2' },
+    active:    { label: 'Active',    color: '#16a34a' },
+    landed:    { label: 'Landed',    color: '#64748b' },
+    delayed:   { label: 'Delayed',   color: '#dc2626' },
+    holding:   { label: 'Holding',   color: '#7c3aed' },
+  };
+
+  function delayBadge(mins) {
+    if (!mins) return `<span class="badge b-ok">✓ On time</span>`;
+    if (mins > 30) return `<span class="badge b-hold">⏸ +${mins}m</span>`;
+    return `<span class="badge b-mild">+${mins}m</span>`;
+  }
+
+  function permBadge(type, granted) {
+    if (!type) return '';
+    const cls = type === 'LAND' ? 'b-land' : type === 'TAKE-OFF' ? 'b-dep2' : 'b-hld';
+    return `<span class="badge ${cls}">${granted ? '✓' : '⏸'} ${type}</span>`;
+  }
+
+  function liveBadge(isLive) {
+    return isLive ? `<span class="badge b-live">● LIVE</span>` : `<span class="badge b-sim">SIM</span>`;
+  }
+
+  function renderTable() {
+    let list = flights.filter(f => {
+      if (opFilter === 'ARR'  && f.operation !== 'ARRIVAL')   return false;
+      if (opFilter === 'DEP'  && f.operation !== 'DEPARTURE') return false;
+      if (srcFilter === 'LIVE' && !f.live) return false;
+      return true;
+    });
+
+    const tableEl  = g('flight-list');
+    const emptyEl  = g('no-flights');
+
+    if (!list.length) {
+      tableEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    tableEl.innerHTML = list.map(f => {
+      const s   = statusInfo[f.status] || statusInfo.scheduled;
+      const dly = f.delay_mins || 0;
+      let rowClass = '';
+      if (selected && selected.id === f.id) rowClass = 'selected';
+      else if (dly > 30) rowClass = 'big-delay';
+      else if (dly > 0)  rowClass = 'mild-delay';
+
+      const opBadge = f.operation === 'ARRIVAL'
+        ? '<span class="badge b-arr">▼ ARR</span>'
+        : '<span class="badge b-dep">▲ DEP</span>';
+
+      return `
+        <div class="flight-row ${rowClass}" onclick="pickFlight('${f.id}', ${dly > 0})">
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="cs">${f.callsign}</span>
+            ${liveBadge(f.live)}
+          </div>
+          <div class="al" title="${f.airline}">${f.airline.split(' ')[0]}</div>
+          <div class="ty">${f.type}</div>
+          <div>${opBadge}</div>
+          <div class="t-s">${toTime(f.scheduled_time)}</div>
+          <div class="t-o">${toTime(f.optimized_slot)}</div>
+          <div>${delayBadge(f.delay_mins)}</div>
+          <div>${permBadge(f.permission_type, f.permission_granted)}</div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="s-dot" style="background:${s.color};"></span>
+            <span style="color:${s.color};font-size:10px;font-weight:500;">${s.label}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderTimeline() {
+    // build the time ruler labels if not done yet
+    const ruler = g('tl-ruler');
+    if (!ruler.children.length) {
+      ruler.innerHTML = Array.from({ length: 9 }, (_, i) =>
+        `<div style="flex:1;font-size:9px;font-weight:500;color:#94a3b8;">${toTime(480 + i * 15)}</div>`
+      ).join('');
+    }
+
+    // move the now line
+    const nowPct = Math.min(100, ((simTime - 480) / 120) * 100);
+    g('now-arr').style.left = nowPct + '%';
+    g('now-dep').style.left = nowPct + '%';
+
+    // draw blips for arrivals and departures
+    ['ARRIVAL', 'DEPARTURE'].forEach((op, idx) => {
+      const trackId = idx === 0 ? 'track-arr' : 'track-dep';
+      const track   = g(trackId);
+      const baseCol = idx === 0 ? '#1e40af' : '#16a34a';
+      const baseBg  = idx === 0 ? '#eff6ff' : '#f0fdf4';
+
+      // remove old blips
+      track.querySelectorAll('.tl-blip').forEach(b => b.remove());
+
+      flights.filter(f => f.operation === op).forEach(f => {
+        const pct = Math.max(0, Math.min(95, ((f.optimized_slot - 480) / 120) * 100));
+        let bc = baseCol, bg = baseBg;
+        if (f.delay_mins > 30)     { bc = '#ef4444'; bg = '#fff5f5'; }
+        else if (f.delay_mins > 0) { bc = '#f59e0b'; bg = '#fffbeb'; }
+        else if (f.live)           { bc = '#059669'; bg = '#ecfdf5'; }
+
+        const blip = document.createElement('div');
+        blip.className   = 'tl-blip';
+        blip.title       = `${f.callsign} · ${toTime(f.optimized_slot)}${f.delay_mins ? ` (+${f.delay_mins}m)` : ''}${f.live ? ' · LIVE' : ''}`;
+        blip.style.cssText = `left:${pct}%;background:${bg};border:1.5px solid ${bc};color:${bc};`;
+        blip.textContent = (f.callsign || '').slice(-3);
+        blip.onclick     = () => pickFlight(f.id, f.delay_mins > 0);
+        track.appendChild(blip);
+      });
+    });
+  }
+
+  function renderTicker() {
+    if (!flights.length) return;
+    const items = [...flights, ...flights];
+    g('ticker-inner').innerHTML = items.map(f => {
+      const s = statusInfo[f.status] || statusInfo.scheduled;
+      return `
+        <span style="margin-right:40px;opacity:0.9;">
+          <span style="color:#93c5fd;">${f.callsign}</span>
+          ${f.live ? '<span style="color:#6ee7b7;margin-left:3px;">●</span>' : ''}
+          <span style="color:rgba(255,255,255,0.3);margin:0 5px;">·</span>
+          <span style="color:${f.operation === 'ARRIVAL' ? '#bfdbfe' : '#bbf7d0'}">${f.operation === 'ARRIVAL' ? 'ARR' : 'DEP'}</span>
+          <span style="color:rgba(255,255,255,0.3);margin:0 5px;">·</span>
+          <span style="color:#e0f2fe;">${toTime(f.optimized_slot)}</span>
+          ${f.delay_mins > 0 ? `<span style="color:#fca5a5;margin-left:4px;">+${f.delay_mins}m</span>` : ''}
+        </span>`;
+    }).join('');
+  }
+
+  // ---- flight selection and detail ----
+
+  function pickFlight(id, openDelayModal = false) {
+    selected = flights.find(f => f.id === id) || null;
+    renderTable();
+    renderDetail();
+    if (openDelayModal && selected && selected.delay_mins > 0) {
+      openModal(selected);
+    }
+  }
+
+  function renderDetail() {
+    const area = g('detail-area');
+
+    if (!selected) {
+      area.innerHTML = `
+        <div style="padding:30px 0;text-align:center;">
+          <div style="font-size:36px;margin-bottom:12px;">✈</div>
+          <div style="font-size:12px;color:#94a3b8;line-height:1.8;">
+            Select any flight to view details.<br>
+            Click a delayed flight for the ATC decision.
+          </div>
+        </div>`;
+      return;
+    }
+
+    const f    = selected;
+    const stat = statusInfo[f.status] || statusInfo.scheduled;
+
+    const delayBlock = f.delay_mins > 0 ? `
+      <div class="delay-warn" onclick="openModal(selected)">
+        <div style="font-size:10px;font-weight:700;color:#dc2626;margin-bottom:4px;">⚠ DELAY DETECTED — Click for ATC Decision</div>
+        <div style="font-size:13px;font-weight:600;color:#1e293b;font-family:'JetBrains Mono',monospace;">+${f.delay_mins} minutes delayed</div>
+        ${f.swapped_with ? `<div style="font-size:10px;color:#64748b;margin-top:3px;">Slot reassigned to ${f.swapped_with}</div>` : ''}
+      </div>` : '';
+
+    const rows = [
+      ['Aircraft',    `${f.type} · ${f.category}`],
+      ['Operation',   f.operation],
+      ['From',        f.origin],
+      ['To',          f.destination],
+      ['Gate',        f.gate],
+      ['Scheduled',   toTime(f.scheduled_time)],
+      ['Opt Slot',    toTime(f.optimized_slot)],
+      ['Delay',       f.delay_mins > 0 ? `+${f.delay_mins} min` : 'On time'],
+      ['Runway',      f.runway || '—'],
+      ['Passengers',  f.passengers],
+      ['Fuel Lost',   toKg(f.fuel_lost_kg)],
+      ['Cost',        toGbp(f.cost_gbp)],
+      ['CO₂',         toKg(f.co2_kg)],
+      ['Data Source', f.live ? 'AviationStack (live)' : 'Simulated'],
+      ['Status',      stat.label],
+    ];
+
+    const notesBlock = (f.notes || []).length > 0 ? `
+      <div style="margin-top:10px;">
+        <div class="sec-hdr">ATC Notes</div>
+        ${f.notes.map(n => `<div class="note-txt">· ${n}</div>`).join('')}
+      </div>` : '';
+
+    area.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:20px;color:#1e293b;">${f.callsign}</span>
+            ${liveBadge(f.live)}
+          </div>
+          <div style="font-size:11px;color:#64748b;">${f.airline}</div>
+        </div>
+        ${permBadge(f.permission_type, f.permission_granted)}
+      </div>
+      ${delayBlock}
+      ${rows.map(([k, v]) => `<div class="d-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join('')}
+      ${notesBlock}`;
+  }
+
+  // ---- modal ----
+
+  function openModal(f) {
+    g('m-callsign').textContent = f.callsign;
+    g('m-airline').textContent  = f.airline;
+    g('m-from').textContent     = f.origin;
+    g('m-to').textContent       = f.destination;
+
+    g('m-kpis').innerHTML = [
+      { label: 'Scheduled', val: toTime(f.scheduled_time), color: '#64748b' },
+      { label: 'New ETA',   val: toTime(f.eta),            color: '#dc2626' },
+      { label: 'Delay',     val: `+${f.delay_mins} min`,   color: '#d97706' },
+    ].map(k => `
+      <div class="kpi">
+        <div class="kpi-lbl">${k.label}</div>
+        <div class="kpi-val" style="color:${k.color}">${k.val}</div>
+      </div>`).join('');
+
+    g('m-costs').innerHTML = [
+      { label: 'Fuel Lost',    val: toKg(f.fuel_lost_kg), color: '#d97706' },
+      { label: 'Cost Impact',  val: toGbp(f.cost_gbp),    color: '#dc2626' },
+      { label: 'CO₂ Emitted',  val: toKg(f.co2_kg),       color: '#16a34a' },
+    ].map(k => `
+      <div class="kpi">
+        <div class="kpi-lbl">${k.label}</div>
+        <div class="kpi-val" style="color:${k.color};font-size:15px;">${k.val}</div>
+      </div>`).join('');
+
+    // weather note
+    const wxEl = g('m-wx');
+    if (wxData && wxData.live) {
+      wxEl.style.display = 'block';
+      const c = wxData.severity === 'critical' ? '#fff5f5' : wxData.severity === 'warning' ? '#fffbeb' : '#f0fdf4';
+      const b = wxData.severity === 'critical' ? '#fecaca' : wxData.severity === 'warning' ? '#fde68a' : '#bbf7d0';
+      const t = wxData.severity === 'critical' ? '#dc2626' : wxData.severity === 'warning' ? '#d97706' : '#16a34a';
+      wxEl.innerHTML = `
+        <div style="background:${c};border:1px solid ${b};border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;">
+          <img src="${wxData.icon_url}" style="width:32px;height:32px;" />
+          <div style="font-size:11px;color:#334155;line-height:1.6;">
+            <strong>Live weather at EGBB:</strong> ${wxData.description}, ${wxData.temp}°C, wind ${wxData.wind_kt} kt, vis ${wxData.visibility_km} km<br>
+            <span style="font-weight:600;color:${t}">${wxData.condition}</span>
+          </div>
+        </div>`;
+    } else {
+      wxEl.style.display = 'none';
+    }
+
+    // flights using the freed slot
+    const freed = flights.filter(x =>
+      x.id !== f.id
+      && x.delay_mins === 0
+      && x.optimized_slot >= (f.scheduled_time - 2)
+      && x.optimized_slot <= (f.eta + 3)
+    );
+
+    g('m-freed').innerHTML = freed.length
+      ? freed.map(x => `
+          <div class="freed-row">
+            <div>
+              <span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;color:#1e293b;">${x.callsign}</span>
+              ${liveBadge(x.live)}
+              <span style="color:#64748b;font-size:11px;margin-left:6px;">${x.airline} · ${x.type}</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${permBadge(x.permission_type, true)}
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#16a34a;">${toTime(x.optimized_slot)}</span>
+            </div>
+          </div>`).join('')
+      : `<div style="font-size:12px;color:#94a3b8;padding:10px;background:#f8fafc;border-radius:8px;">
+           No on-time flights available in freed window — slot held for ${f.callsign}.
+         </div>`;
+
+    // atc decision lines
+    const decision = makeAtcDecision(f, flights, wxData);
+    g('m-decision').innerHTML = `
+      <div class="atc-box">
+        <div class="atc-hdr">Birmingham Approach Control · EGBB</div>
+        ${decision.map(line => `<div class="atc-line">${line}</div>`).join('')}
+      </div>`;
+
+    g('modal-bg').classList.add('open');
+  }
+
+  function closeModal() {
+    g('modal-bg').classList.remove('open');
+  }
+
+  // ---- tab and filter switching ----
+
+  function switchTab(name) {
+    currentTab = name;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.toLowerCase().includes(name === 'schedule' ? 'sched' : name));
+    });
+    g('table-area').style.display    = name === 'schedule' ? 'block' : 'none';
+    g('timeline-area').style.display = name === 'timeline' ? 'flex'  : 'none';
+    if (name === 'timeline') renderTimeline();
+  }
+
+  function setFilter(f) {
+    opFilter = f;
+    document.querySelectorAll('.flt-btn[data-f]').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+    renderTable();
+  }
+
+  function setSrc(s) {
+    srcFilter = s;
+    document.querySelectorAll('.flt-btn[data-s]').forEach(b => b.classList.toggle('active', b.dataset.s === s));
+    renderTable();
+  }
+
+  // ---- radar canvas ----
+
+  (function drawRadar() {
+    const canvas = g('radar');
+    const ctx    = canvas.getContext('2d');
+    const cx = 98, cy = 98, R = 88;
+
+    function frame() {
+      ctx.clearRect(0, 0, 196, 196);
+
+      // background circle
+      ctx.fillStyle = '#f0f9ff';
+      ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, Math.PI * 2); ctx.fill();
+
+      // range rings
+      for (let i = 1; i <= 4; i++) {
+        ctx.beginPath(); ctx.arc(cx, cy, R * i / 4, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(59,130,246,${0.07 + i * 0.035})`;
+        ctx.lineWidth = 1; ctx.stroke();
+      }
+
+      // crosshairs
+      ctx.strokeStyle = 'rgba(59,130,246,0.07)';
+      ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.stroke();
+
+      // bhx label
+      ctx.fillStyle = '#1e40af';
+      ctx.font = 'bold 9px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('BHX', cx, cy + 4);
+      ctx.textAlign = 'left';
+
+      // runway line
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(150 * Math.PI / 180);
+      ctx.strokeStyle = 'rgba(22,163,74,0.5)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(22, 0); ctx.stroke();
+      ctx.restore();
+
+      // sweep arm
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(radarAngle);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, -Math.PI / 5, 0); ctx.closePath();
+      ctx.fillStyle = 'rgba(59,130,246,0.05)'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R, 0);
+      ctx.strokeStyle = 'rgba(59,130,246,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+
+      // flight blips
+      const count = Math.min(flights.length, 18);
+      for (let i = 0; i < count; i++) {
+        const f     = flights[i];
+        const angle = (i / Math.max(count, 1)) * Math.PI * 2 + i * 0.45;
+        const dist  = 0.2 + (i % 4) * 0.18;
+        const x     = cx + Math.cos(angle) * R * dist;
+        const y     = cy + Math.sin(angle) * R * dist;
+
+        let color = f.operation === 'ARRIVAL' ? '#3b82f6' : '#16a34a';
+        if ((f.delay_mins || 0) > 30)      color = '#ef4444';
+        else if ((f.delay_mins || 0) > 0)  color = '#f59e0b';
+        else if (f.live)                    color = '#059669';
+
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 5;
+        ctx.fill(); ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#475569'; ctx.font = '8px monospace';
+        ctx.fillText((f.callsign || '').slice(-3), x + 5, y - 2);
+      }
+
+      radarAngle = (radarAngle + 0.012) % (Math.PI * 2);
+      requestAnimationFrame(frame);
+    }
+
+    frame();
+  })();
+
+  // ---- ticker scroll animation ----
+
+  (function scrollTicker() {
+    tickerPos = (tickerPos - 0.5) % 5000;
+    g('ticker-inner').style.transform = `translateX(${tickerPos}px)`;
+    requestAnimationFrame(scrollTicker);
+  })();
+
+  // ---- clock update ----
+
+  setInterval(() => {
+    simTime++;
+    g('clock').textContent = toTime(simTime);
+    renderTimeline();
+  }, 4000);
+
+  // ---- kick everything off ----
+
+  startApp();
+</script>
+
+</body>
+</html>
